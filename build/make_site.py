@@ -18,7 +18,9 @@ head_part, body_part = src[:cut], src[cut:]
 head_part = head_part.replace('<meta name="claude:viewport-fit-sides" content="cover">\n', "")
 # Self-hosted fonts instead of Google Fonts (no third-party requests; GDPR-friendly)
 head_part = re.sub(r'<link rel="preconnect"[^>]*>\n', "", head_part)
-head_part = re.sub(r'<link rel="stylesheet" href="https://fonts.googleapis.com[^>]*>', '<link rel="stylesheet" href="fonts.css">', head_part)
+import hashlib
+_ver = hashlib.sha1(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts.py"), "rb").read()).hexdigest()[:8]
+head_part = re.sub(r'<link rel="stylesheet" href="https://fonts.googleapis.com[^>]*>', f'<link rel="stylesheet" href="fonts.css?v={_ver}">', head_part)
 
 desc = ("Every 2027/28 Trinity exchange that fits your BESS pathway, "
         "School and College-wide. Save and rank your favourites.")
