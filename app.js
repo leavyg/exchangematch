@@ -45,14 +45,14 @@ const LANGS = ["French","German","Spanish","Italian","Polish","Russian","Japanes
 const REGIONS = ["Europe","Asia","Australia & NZ","North America","Latin America","Africa & Middle East"];
 
 /* ---------- State ---------- */
-const state = {step:1,started:false,path:"jh-bus-econ",minor:"Economics",fb:"abroad",length:"any",langs:new Set(),regions:new Set(),view:"school",sort:"fit"};
+const state = {step:1,started:false,path:"jh-bus-econ",minor:"Economics",fb:"abroad",length:"any",langs:new Set(),regions:new Set(),view:"school",type:"both",sort:"fit"};
 try{
   const p=JSON.parse(localStorage.getItem("em-profile")||"null");
   if(p){ if(PATHS[p.path]) state.path=p.path; if(MINORS.includes(p.minor)) state.minor=p.minor; if(p.fb==="tcd"||p.fb==="abroad") state.fb=p.fb;
     if(LENGTHS.some(l=>l[0]===p.length)) state.length=p.length; (p.langs||[]).forEach(l=>LANGS.includes(l)&&state.langs.add(l)); (p.regions||[]).forEach(r=>REGIONS.includes(r)&&state.regions.add(r));
-    if(p.view==="school"||p.view==="college") state.view=p.view; if(p.started) state.started=true; }
+    if(p.view==="school"||p.view==="college") state.view=p.view; if(["both","school","college"].includes(p.type)) state.type=p.type; if(p.started) state.started=true; }
 }catch(e){}
-function saveProfile(){ try{ localStorage.setItem("em-profile", JSON.stringify({path:state.path,minor:state.minor,fb:state.fb,length:state.length,langs:[...state.langs],regions:[...state.regions],view:state.view,started:state.started})); }catch(e){} }
+function saveProfile(){ try{ localStorage.setItem("em-profile", JSON.stringify({path:state.path,minor:state.minor,fb:state.fb,length:state.length,langs:[...state.langs],regions:[...state.regions],view:state.view,type:state.type,started:state.started})); }catch(e){} }
 function dataKey(){
   if(state.path==="maj-bus") return state.fb==="tcd" ? "maj-bus-tcd" : `maj-bus-${MINOR_KEY[state.minor]}-abroad`;
   return state.path;
@@ -258,6 +258,8 @@ document.getElementById("panel").addEventListener("click",e=>{
 });
 
 /* ---------- Dropdowns ---------- */
+const TYPES=[["both","School and College-wide"],["school","School only"],["college","College-wide only"]];
+const typeOptions = () => TYPES.map(([v,l])=>`<option value="${v}" ${state.type===v?"selected":""}>${l}</option>`).join("");
 const lengthOptions = () => LENGTHS.map(([v,l])=>`<option value="${v}" ${state.length===v?"selected":""}>${l}</option>`).join("");
 function pathOptions(){
   return PATH_GROUPS.map(([g,keys])=>`<optgroup label="${g}">${keys.map(k=>`<option value="${k}" ${state.path===k?"selected":""}>${esc(PATHS[k].label)}</option>`).join("")}</optgroup>`).join("");
@@ -298,6 +300,7 @@ function renderForm(){
   document.getElementById("path").innerHTML = pathOptions();
   document.getElementById("minors").innerHTML = MINORS.map(m=>optionChip("minor",m,m,state.minor===m)).join("");
   document.getElementById("fb").innerHTML = optionChip("fb","abroad","Abroad, with Business",state.fb==="abroad") + optionChip("fb","tcd","At Trinity, other semester",state.fb==="tcd");
+  document.getElementById("type").innerHTML = typeOptions();
   document.getElementById("length").innerHTML = lengthOptions();
   document.getElementById("langs").innerHTML = msel("ms-lang","lang",LANGS,state.langs,"langs-l",false);
   document.getElementById("regions").innerHTML = msel("ms-region","region",REGIONS,state.regions,"regions-l",false);
@@ -316,6 +319,10 @@ function syncForm(){
   const c=counts();
   document.getElementById("c-school").textContent=c.school;
   document.getElementById("c-college").textContent=c.college;
+  const t=state.type;
+  document.querySelector("#sentence .s").hidden = t==="college";
+  document.querySelector("#sentence .c").hidden = t==="school";
+  document.getElementById("s-and").hidden = t!=="both";
 }
 document.getElementById("form").addEventListener("change",e=>{
   const t=e.target;
@@ -323,6 +330,7 @@ document.getElementById("form").addEventListener("change",e=>{
   else if(t.name==="minor") state.minor=t.value;
   else if(t.name==="fb") state.fb=t.value;
   else if(t.name==="length") state.length=t.value;
+  else if(t.name==="type") setType(t.value);
   else if(t.name==="lang") t.checked?state.langs.add(t.value):state.langs.delete(t.value);
   else if(t.name==="region") t.checked?state.regions.add(t.value):state.regions.delete(t.value);
   else return;
@@ -339,15 +347,16 @@ function renderBar(){
     h += sel("bar-fb","fb","f-sm","Minor modules",`<option value="abroad" ${state.fb==="abroad"?"selected":""}>Abroad</option><option value="tcd" ${state.fb==="tcd"?"selected":""}>At Trinity</option>`);
   }
   h += `<span class="sep" aria-hidden="true"></span>`;
+  h += sel("f-type","f-type","f-sm","Exchange type",typeOptions());
   h += sel("f-length","f-length","f-sm","Length",lengthOptions());
   h += `<div class="field f-sm"><span class="flabel" id="f-region-l">Region</span>${msel("ms-f-region","f-region",REGIONS,state.regions,"f-region-l",true)}</div>`;
   h += `<div class="field f-sm"><span class="flabel" id="f-lang-l">Languages</span>${msel("ms-f-lang","f-lang",LANGS,state.langs,"f-lang-l",true)}</div>`;
-  const active = state.length!=="any" || state.langs.size || state.regions.size;
+  const active = state.type!=="both" || state.length!=="any" || state.langs.size || state.regions.size;
   h += `<div class="tb-end">${active?`<button class="linkbtn" id="clear">Clear filters</button>`:""}<button class="ghost" id="edit">Start over</button></div>`;
   document.getElementById("bar").innerHTML=`<div class="toolbar">${h}</div>`;
   document.getElementById("edit").onclick=()=>go(1);
   const c=document.getElementById("clear");
-  if(c) c.onclick=()=>{ state.length="any"; state.langs.clear(); state.regions.clear(); saveProfile(); refresh(null); };
+  if(c) c.onclick=()=>{ state.type="both"; state.length="any"; state.langs.clear(); state.regions.clear(); saveProfile(); refresh(null); };
 }
 function refresh(focusId){
   renderForm(); renderResults();
@@ -359,6 +368,7 @@ document.getElementById("step2").addEventListener("change",e=>{
   else if(k==="minor") state.minor=t.value;
   else if(k==="fb") state.fb=t.value;
   else if(k==="f-length") state.length=t.value;
+  else if(k==="f-type") setType(t.value);
   else if(k==="f-lang") t.checked?state.langs.add(t.value):state.langs.delete(t.value);
   else if(k==="f-region") t.checked?state.regions.add(t.value):state.regions.delete(t.value);
   else return;
@@ -368,6 +378,7 @@ const sortSel = () => `<span class="sort"><label for="sort">Sort</label><select 
   ${[["fit","Best fit first"],["name","A–Z"],["country","Country"],["places","Most places"]].map(([v,l])=>`<option value="${v}" ${state.sort===v?"selected":""}>${l}</option>`).join("")}</select></span>`;
 function renderResults(){
   renderBar(); LISTS={};
+  if(state.type!=="both") state.view=state.type;
   const v=state.view, m=matches(v);
   const fits=[...m.verified,...m.condition].sort(sorter);
   const c=counts();
@@ -375,6 +386,10 @@ function renderResults(){
   document.getElementById("n-college").textContent=c.college;
   document.getElementById("tab-school").setAttribute("aria-selected", v==="school");
   document.getElementById("tab-college").setAttribute("aria-selected", v==="college");
+  const only = state.type!=="both";
+  document.querySelector(".views").classList.toggle("one", only);
+  document.getElementById("tab-school").hidden = state.type==="college";
+  document.getElementById("tab-college").hidden = state.type==="school";
   let body="";
   if(v==="school"){
     const byOwner={}; fits.forEach(x=>(byOwner[x.rec.runBy]=byOwner[x.rec.runBy]||[]).push(x));
@@ -392,6 +407,7 @@ function renderResults(){
   document.getElementById("panel").innerHTML = `<div class="tools">${legend}${sortSel()}</div>${body}${unknownBlock(m.unknown.sort(sorter), false)}${nofitBlock(m.nofit)}`;
   document.getElementById("sort").onchange=e=>{ state.sort=e.target.value; renderResults(); };
 }
+function setType(t){ state.type=t; if(t!=="both") state.view=t; }
 function setView(v){ state.view=v; saveProfile(); closeDetail(); renderResults(); }
 document.getElementById("tab-school").onclick=()=>setView("school");
 document.getElementById("tab-college").onclick=()=>setView("college");
